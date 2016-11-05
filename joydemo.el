@@ -20,6 +20,39 @@
 (defvar-local joydemo-timer nil
   "Timer for gathering joystick events.")
 
+(defgroup joydemo ()
+  "Joystick calibration demo."
+  :group 'external)
+
+(defface joydemo-knob
+  '((t :foreground "#f00"
+       :background "#ccc"
+       :weight ultra-bold))
+  "Face for the slider knob."
+  :group 'joydemo)
+
+(defface joydemo-brace
+  '((t :weight bold
+       :background "#aaa"))
+  "Face for slider braces (left and right)."
+  :group 'joydemo)
+
+(defface joydemo-slider
+  '((t :background "#ddd"))
+  "Face for slider background."
+  :group 'joydemo)
+
+(defface joydemo-button-on
+  '((t :foreground "#fff"
+       :background "#f00"))
+  "Face when button is pressed."
+  :group 'joydemo)
+
+(defface joydemo-button-off
+  '((t :foreground "#777"))
+  "Face when button is not pressed."
+  :group 'joydemo)
+
 (defun joydemo--grow (vec length)
   "Return VEC resized to LENGTH."
   (if (= length (length vec))
@@ -78,17 +111,20 @@
     (dolist (axis (cl-coerce axes 'list))
       (let* ((left (floor (* width (/ (+ axis 1.0) 2.0))))
              (right (- width left)))
-        (insert (propertize "[" 'face '((:weight bold))))
-        (dotimes (_ left)
-          (insert-char ?-))
-        (insert (propertize "#" 'face 'font-lock-warning-face))
-        (dotimes (_ right)
-          (insert-char ?-))
-        (insert (propertize "]\n\n" 'face '((:weight bold))))))
-    (dolist (button (cl-coerce buttons 'list))
-      (insert (if button
-                  (propertize "X  " 'face 'font-lock-warning-face)
-                (propertize "O  " 'face 'font-lock-comment-face))))
+        (insert (propertize "[" 'face 'joydemo-brace))
+        (insert (propertize (make-string left ? ) 'face 'joydemo-slider))
+        (insert (propertize "#" 'face 'joydemo-knob))
+        (insert (propertize (make-string right ? ) 'face 'joydemo-slider))
+        (insert (propertize "]" 'face 'joydemo-brace))
+        (insert "\n\n")))
+    (dotimes (i (length buttons))
+      (let* ((button (aref buttons i))
+             (names "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+             (name (substring names i (1+ i))))
+        (insert (if button
+                    (propertize name 'face 'joydemo-button-on)
+                  (propertize name 'face 'joydemo-button-off))))
+      (insert "  "))
     (center-line)
     (newline)))
 
