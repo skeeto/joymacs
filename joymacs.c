@@ -7,21 +7,18 @@
 #include <linux/joystick.h>
 #include "emacs-module.h"
 
+/* Frequently-used symbols. */
 static emacs_value nil;
 static emacs_value t;
 static emacs_value button;
 static emacs_value axis;
 
 static void
-fin_close(void *fd)
+fin_close(void *fdptr)
 {
-    close((intptr_t)fd);
-}
-
-static void
-fin_empty(void *ptr)
-{
-    (void)ptr;
+    int fd = (intptr_t)fdptr;
+    if (fd != -1)
+        close(fd);
 }
 
 #define JOYMACS_OPEN                                    \
@@ -66,11 +63,10 @@ joymacs_close(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
     if (env->non_local_exit_check(env) != emacs_funcall_exit_return)
         return nil;
     int fd = (intptr_t)fdptr;
-    if (fd == -1)
-        return nil;
-    close(fd);
-    env->set_user_ptr(env, args[0], (void *)(intptr_t)-1);
-    env->set_user_finalizer(env, args[0], fin_empty);
+    if (fd != -1) {
+        close(fd);
+        env->set_user_ptr(env, args[0], (void *)(intptr_t)-1);
+    }
     return t;
 }
 
@@ -88,16 +84,15 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
 {
     (void)n;
     (void)ptr;
-    void *fd = env->get_user_ptr(env, args[0]);
+    int fd = (intptr_t)env->get_user_ptr(env, args[0]);
     if (env->non_local_exit_check(env) != emacs_funcall_exit_return)
         return nil;
-    struct js_event e = {0};
-    errno = 0;
-    read((intptr_t)fd, &e, sizeof(e));
-    if (errno == EAGAIN) {
+    struct js_event e;
+    int r = read(fd, &e, sizeof(e));
+    if (r == -1 && errno == EAGAIN) {
         /* No more events. */
         return nil;
-    } if (errno && errno != EAGAIN) {
+    } if (r == -1) {
         /* An actual read error (joystick unplugged, etc.). */
         emacs_value signal = env->intern(env, "file-error");
         const char *error = strerror(errno);
