@@ -59,15 +59,14 @@ joymacs_close(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
 {
     (void)ptr;
     (void)n;
-    void *fdptr = env->get_user_ptr(env, args[0]);
+    int fd = (intptr_t)env->get_user_ptr(env, args[0]);
     if (env->non_local_exit_check(env) != emacs_funcall_exit_return)
         return nil;
-    int fd = (intptr_t)fdptr;
     if (fd != -1) {
         close(fd);
         env->set_user_ptr(env, args[0], (void *)(intptr_t)-1);
     }
-    return t;
+    return nil;
 }
 
 #define JOYMACS_READ                                                    \
