@@ -1,7 +1,8 @@
 # Joystick Dynamic Module for Emacs
 
-Only Linux is currently supported. If Emacs 25 is installed and a
-joystick is plugged in, try `make run`.
+If Emacs 25 is installed and a joystick is plugged in, try `make run`.
+
+Supported platforms: Linux, Windows
 
 Full article: [Emacs, Dynamic Modules, and
 Joysticks](http://nullprogram.com/blog/2016/11/05/)
