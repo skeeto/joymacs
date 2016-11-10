@@ -22,9 +22,9 @@ fin_close(void *fdptr)
 }
 
 #define JOYMACS_OPEN                                    \
-    "(joymacs-open ID)\n"                               \
+    "(joymacs-open N)\n"                                \
     "\n"                                                \
-    "Creates a handle for a joystick given its ID."
+    "Create a handle for the Nth joystick."
 
 static emacs_value
 joymacs_open(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
@@ -49,7 +49,7 @@ joymacs_open(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
 #define JOYMACS_CLOSE                                                    \
     "(joymacs-close JOYSTICK)\n"                                         \
     "\n"                                                                 \
-    "Destroy this handle for JOYSTICK.\n"                                \
+    "Immediately destroy JOYSTICK handle.\n"                             \
     "\n"                                                                 \
     "Handles close automatically through garbage collection, but this\n" \
     "releases the resources immediately."
