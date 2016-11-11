@@ -9,7 +9,13 @@
 ;;; Code:
 
 (require 'cl-lib)
-(require 'joymacs)
+
+;; Don't require dynamic module at byte compile time.
+(declare-function joymacs-open  "joymacs" (n))
+(declare-function joymacs-close "joymacs" (joystick))
+(declare-function joymacs-read  "joymacs" (joystick event))
+(cl-eval-when (load eval)
+  (require 'joymacs))
 
 (defvar joydemo-buffer " *joydemo*"
   "Buffer used to display joystick calibration demo.")
