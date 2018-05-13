@@ -1,4 +1,4 @@
-EMACS    = emacs25
+EMACS    = emacs
 MINGW_CC = x86_64-w64-mingw32-gcc
 CFLAGS   = -std=c99 -s -Wall -Wextra -O3 -fpic
 
