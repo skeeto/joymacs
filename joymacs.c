@@ -1,10 +1,6 @@
 #include "emacs-module.h"
 
-/* Frequently-used symbols. */
-static emacs_value nil;
-static emacs_value t;
-static emacs_value button;
-static emacs_value axis;
+#define S(s) (env->intern(env, s))
 
 #define JOYMACS_OPEN                                                     \
     "(joymacs-open N)\n"                                                 \
@@ -54,7 +50,7 @@ joymacs_open(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
     (void)n;
     int id = env->extract_integer(env, args[0]);
     if (env->non_local_exit_check(env) != emacs_funcall_exit_return)
-        return nil;
+        return S("nil");
     char buf[64];
     int buflen = sprintf(buf, "/dev/input/js%d", id);
     int fd = open(buf, O_RDONLY | O_NONBLOCK);
@@ -62,7 +58,7 @@ joymacs_open(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
         emacs_value signal = env->intern(env, "file-error");
         emacs_value message = env->make_string(env, buf, buflen);
         env->non_local_exit_signal(env, signal, message);
-        return nil;
+        return S("nil");
     }
     return env->make_user_ptr(env, fin_close, (void *)(intptr_t)fd);
 }
@@ -75,12 +71,12 @@ joymacs_close(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
     (void)n;
     int fd = (intptr_t)env->get_user_ptr(env, args[0]);
     if (env->non_local_exit_check(env) != emacs_funcall_exit_return)
-        return nil;
+        return S("nil");
     if (fd != -1) {
         close(fd);
         env->set_user_ptr(env, args[0], (void *)(intptr_t)-1);
     }
-    return nil;
+    return S("nil");
 }
 
 
@@ -91,33 +87,34 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
     (void)ptr;
     int fd = (intptr_t)env->get_user_ptr(env, args[0]);
     if (env->non_local_exit_check(env) != emacs_funcall_exit_return)
-        return nil;
+        return S("nil");
     struct js_event e;
     int r = read(fd, &e, sizeof(e));
     if (r == -1 && errno == EAGAIN) {
         /* No more events. */
-        return nil;
+        return S("nil");
     } if (r == -1) {
         /* An actual read error (joystick unplugged, etc.). */
         emacs_value signal = env->intern(env, "file-error");
         const char *error = strerror(errno);
         emacs_value message = env->make_string(env, error, strlen(error));
         env->non_local_exit_signal(env, signal, message);
-        return nil;
+        return S("nil");
     } else {
         /* Fill out event vector. */
         emacs_value v = args[1];
-        emacs_value type = e.type & JS_EVENT_BUTTON ? button : axis;
+        emacs_value button = S(":button");
+        emacs_value type = e.type & JS_EVENT_BUTTON ? button : S(":axis");
         emacs_value value;
         if (type == button)
-            value = e.value ? t : nil;
+            value = e.value ? S("t") : S("nil");
         else
             value =  env->make_float(env, e.value / (double)INT16_MAX);
         env->vec_set(env, v, 0, env->make_integer(env, e.time));
         env->vec_set(env, v, 1, type);
         env->vec_set(env, v, 2, value);
         env->vec_set(env, v, 3, env->make_integer(env, e.number));
-        env->vec_set(env, v, 4, e.type & JS_EVENT_INIT ? t : nil);
+        env->vec_set(env, v, 4, e.type & JS_EVENT_INIT ? S("t") : S("nil"));
         return args[1];
     }
 }
@@ -170,7 +167,7 @@ joymacs_open(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
     (void)ptr;
     DWORD id = env->extract_integer(env, args[0]);
     if (env->non_local_exit_check(env) != emacs_funcall_exit_return)
-        return nil;
+        return S("nil");
     if (!handle_count++)
         XInputEnable(TRUE);
     XINPUT_STATE state;
@@ -181,7 +178,7 @@ joymacs_open(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
         env->non_local_exit_signal(env, signal, message);
         if (!--handle_count)
             XInputEnable(FALSE);
-        return nil;
+        return S("nil");
     } else {
         struct handle *h = malloc(sizeof(*h));
         h->prev = state;
@@ -213,10 +210,10 @@ static inline emacs_value
 vecf(emacs_env *env, struct handle *h, emacs_value v, double value)
 {
     env->vec_set(env, v, 0, env->make_integer(env, h->time));
-    env->vec_set(env, v, 1, axis);
+    env->vec_set(env, v, 1, S(":axis"));
     env->vec_set(env, v, 2, env->make_float(env, value));
     env->vec_set(env, v, 3, env->make_integer(env, h->report - 1));
-    env->vec_set(env, v, 4, h->init ? nil : t);
+    env->vec_set(env, v, 4, h->init ? S("nil") : S("t"));
     return v;
 }
 
@@ -224,10 +221,10 @@ static inline emacs_value
 vecb(emacs_env *env, struct handle *h, emacs_value v, emacs_value value)
 {
     env->vec_set(env, v, 0, env->make_integer(env, h->time));
-    env->vec_set(env, v, 1, button);
+    env->vec_set(env, v, 1, S(":button"));
     env->vec_set(env, v, 2, value);
     env->vec_set(env, v, 3, env->make_integer(env, h->report - 9));
-    env->vec_set(env, v, 4, h->init ? nil : t);
+    env->vec_set(env, v, 4, h->init ? S("nil") : S("t"));
     return v;
 }
 
@@ -238,7 +235,10 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
     (void)ptr;
     struct handle *h = env->get_user_ptr(env, args[0]);
     if (!h)
-        return nil;
+        return S("nil");
+    emacs_value b;
+    emacs_value t = S("t");
+    emacs_value nil = S("nil");
     emacs_value v = args[1];
     XINPUT_GAMEPAD *g0 = &h->prev.Gamepad;
     XINPUT_GAMEPAD *g1 = &h->next.Gamepad;
@@ -330,7 +330,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_A) {
-                    emacs_value b = b1 & XINPUT_GAMEPAD_A ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_A ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -339,7 +339,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_B) {
-                    emacs_value b = b1 & XINPUT_GAMEPAD_B ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_B ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -348,7 +348,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_X) {
-                    emacs_value b = b1 & XINPUT_GAMEPAD_X ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_X ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -357,7 +357,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_Y) {
-                    emacs_value b = b1 & XINPUT_GAMEPAD_Y ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_Y ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -366,7 +366,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_LEFT_THUMB) {
-                    emacs_value b = b1 & XINPUT_GAMEPAD_LEFT_THUMB ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_LEFT_THUMB ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -375,7 +375,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_RIGHT_THUMB) {
-                    emacs_value b = b1 & XINPUT_GAMEPAD_RIGHT_THUMB ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_RIGHT_THUMB ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -384,7 +384,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_BACK) {
-                    emacs_value b = b1 & XINPUT_GAMEPAD_BACK ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_BACK ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -393,7 +393,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_START) {
-                    emacs_value b = b1 & XINPUT_GAMEPAD_START ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_START ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -402,8 +402,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_LEFT_SHOULDER) {
-                    emacs_value b =
-                        b1 & XINPUT_GAMEPAD_LEFT_SHOULDER ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_LEFT_SHOULDER ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -412,8 +411,7 @@ joymacs_read(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
                 WORD b0 = g0->wButtons;
                 WORD b1 = g1->wButtons;
                 if ((b0 ^ b1) & XINPUT_GAMEPAD_RIGHT_SHOULDER) {
-                    emacs_value b =
-                        b1 & XINPUT_GAMEPAD_RIGHT_SHOULDER ? t : nil;
+                    b = b1 & XINPUT_GAMEPAD_RIGHT_SHOULDER ? t : nil;
                     return vecb(env, h, v, b);
                 }
             } /* Fall through! */
@@ -452,7 +450,7 @@ joymacs_close(emacs_env *env, ptrdiff_t n, emacs_value *args, void *ptr)
         free(h);
         env->set_user_ptr(env, args[0], 0);
     }
-    return t;
+    return S("t");
 }
 
 #endif
@@ -461,12 +459,6 @@ int
 emacs_module_init(struct emacs_runtime *ert)
 {
     emacs_env *env = ert->get_environment(ert);
-
-    /* Gather symbols. */
-    nil = env->intern(env, "nil");
-    t = env->intern(env, "t");
-    button = env->make_global_ref(env, env->intern(env, ":button"));
-    axis = env->make_global_ref(env, env->intern(env, ":axis"));
 
     /* Bind functions. */
     emacs_value fset = env->intern(env, "fset");
