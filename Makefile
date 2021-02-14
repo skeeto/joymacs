@@ -1,26 +1,22 @@
-EMACS    = emacs
-MINGW_CC = x86_64-w64-mingw32-gcc
-CFLAGS   = -std=c99 -s -Wall -Wextra -O3 -fpic
+.POSIX:
+EMACS   = emacs
+CC      = cc
+CFLAGS  = -std=c99 -Os -Wall -Wextra
+LDFLAGS = -s
+LDLIBS  = $(shell $(EMACS) --batch --eval \
+	      "(if (eq system-type 'windows-nt) (princ \"-lxinput1_3\"))")
+SUFFIX  = $(shell $(EMACS) --batch --eval '(princ module-file-suffix)')
 
-MODULE_SUFFIX := $(shell $(EMACS) -batch --eval '(princ module-file-suffix)')
+all: joymacs$(SUFFIX) joydemo.elc
 
-all : joymacs.so joymacs.dll joydemo.elc
-linux : joymacs.so joydemo.elc
-windows : joymacs.dll joydemo.elc
+joymacs$(SUFFIX): joymacs.c
+	$(CC) -shared -fPIC $(CFLAGS) $(LDFLAGS) -o $@ joymacs.c $(LDLIBS)
 
-joymacs.so : joymacs.c
-	$(CC) -shared $(CFLAGS) -o $@ $^
+joydemo.elc: joydemo.el
+	$(EMACS) -Q --batch -L . -f batch-byte-compile joydemo.el
 
-joymacs.dll : joymacs.c
-	$(MINGW_CC) -shared $(CFLAGS) -o $@ $^ -lxinput1_3
+run: joydemo.elc joymacs$(SUFFIX)
+	$(EMACS) -Q -L . -l joydemo.elc -f joydemo
 
-joydemo.elc : joydemo.el
-	$(EMACS) -Q -batch -L . -f batch-byte-compile $<
-
-run : joydemo.elc joymacs$(MODULE_SUFFIX)
-	$(EMACS) -Q -L . -l $< -f joydemo
-
-clean :
-	$(RM) joymacs.so joymacs.dll joydemo.elc
-
-.PHONY : clean all linux windows
+clean:
+	rm -f joymacs$(SUFFIX) joydemo.elc
