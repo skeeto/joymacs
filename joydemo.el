@@ -68,12 +68,31 @@
         (setf (aref new-vec i) (aref vec i)))
       new-vec)))
 
+(defun joydemo--joysticks ()
+  "Return list of detected joysticks."
+  (with-temp-buffer
+    (call-process "cat" nil t nil "/proc/bus/input/devices")
+    (goto-char (point-min))
+    (let ((devices))
+      (while (re-search-forward "\\(?:js[[:digit:]]+\\)" nil 'noerror)
+        (save-excursion
+          (when (re-search-backward "\\(?:Name=\"\\([^z-a]*?\\)\"\\)" nil 'noerror)
+            (setq devices (push (match-string 1) devices)))))
+      (nreverse (mapcar #'string-trim devices)))))
+
 (define-derived-mode joydemo-mode special-mode "joystick"
   "Mode for joystick calibration demo, launched with `joydemo'."
-  (let ((js (joymacs-open 0))
-        (axes [])
-        (buttons [])
-        (event (make-vector 5 0)))
+  (let* ((joysticks (or (joydemo--joysticks)
+                        (error "No Joysticks detected!")))
+         (js (joymacs-open (cl-position (completing-read "Joystick: "
+                                                         joysticks
+                                                         nil
+                                                         'require-match)
+                                        joysticks
+                                        :test #'string=)))
+         (axes [])
+         (buttons [])
+         (event (make-vector 5 0)))
     (while (joymacs-read js event)
       (let ((type (aref event 1))
             (value (aref event 2))
